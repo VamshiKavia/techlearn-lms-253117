@@ -45,8 +45,10 @@ def get_settings() -> Settings:
     # Parse allowed origins from comma separated list
     origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
     if not origins:
-        # sensible defaults for local dev
-        origin_list = ["http://localhost:3000", "http://127.0.0.1:3000", "*"]
+        # sensible defaults for local dev plus optional REACT_APP_FRONTEND_URL
+        candidate = os.getenv("REACT_APP_FRONTEND_URL", "")
+        base_defaults = ["http://localhost:3000", "http://127.0.0.1:3000"]
+        origin_list = [*(base_defaults), *( [candidate.strip()] if candidate.strip() else [] ), "*"]
     else:
         origin_list = [o.strip() for o in origins.split(",")] if origins else ["*"]
     supabase_url = os.getenv("SUPABASE_URL", "")

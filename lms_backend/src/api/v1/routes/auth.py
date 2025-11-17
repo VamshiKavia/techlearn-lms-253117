@@ -16,8 +16,9 @@ async def me(user=Depends(get_current_user)):
 @router.get(
     "/debug",
     summary="Auth debug",
-    description="Temporary endpoint to echo current auth status and normalized user. Use for integration verification.",
+    description="Temporary endpoint to echo current auth status and normalized user. Use for integration verification.\n\nUsage:\n- Send Authorization: Bearer <supabase_jwt> header.\n- Confirms backend JWKS verification and CORS path.\n- If 401, check anon key validity and frontend token propagation.",
     responses={200: {"description": "Debug info with user and claims (if authenticated)."}, 401: {"description": "Missing or invalid token."}},
+    name="auth_debug",
 )
 async def auth_debug(user=Depends(get_current_user)):
     """Return diagnostic information about the current authenticated user and claims.
