@@ -22,12 +22,35 @@ This repository has migrated from local JWT auth to Supabase Auth.
 ## Steps to Configure
 
 1. Create `.env` files for backend and frontend from provided examples.
-2. In Supabase project settings, copy the project URL and `anon` public key to the frontend; use service role only on server-side if needed (not required here).
+   - Backend requires: `SUPABASE_URL`, `SUPABASE_KEY`
+   - Frontend requires:
+     - Vite: `VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`, `VITE_SITE_URL`
+     - CRA: `REACT_APP_SUPABASE_URL`, `REACT_APP_SUPABASE_KEY`, `REACT_APP_SITE_URL`
+2. In Supabase project settings:
+   - Authentication -> URL Configuration
+     - Set "Site URL" to your frontend origin (e.g., `http://localhost:3000`).
+     - Add any additional redirect URLs if using separate callback routes.
+   - Authentication -> Providers (Email/OAuth)
+     - Ensure redirect URLs include your frontend origin.
 3. Start backend:
    - `uvicorn src.api.main:app --reload --port 3001`
-4. Start frontend and log in via Supabase; the backend will verify JWTs and authorize requests.
+   - CORS: Backend defaults allow `http://localhost:3000` and `http://127.0.0.1:3000`. Override via `CORS_ALLOWED_ORIGINS`.
+4. Start frontend and sign up / log in with Supabase. The backend will verify JWTs via JWKS and authorize requests.
+5. Optional: Use the temporary auth debug endpoint to verify end-to-end:
+   - `GET /api/v1/auth/debug` with header `Authorization: Bearer <access_token>`
 
 ```text
 Health: GET /health -> { status: "OK", db_available: <bool>, auth: "supabase" }
 Me:     GET /api/v1/auth/me (with Bearer token)
+Debug:  GET /api/v1/auth/debug (with Bearer token) -> { authenticated: true, user, claims }
 ```
+
+### Notes
+
+- Frontend uses a single Supabase client (`src/lib/supabaseClient.ts`) and attaches `Authorization: Bearer <access_token>` from `supabase.auth.getSession()` in `src/lib/apiClient.ts`.
+- `emailRedirectTo` during sign-up uses `VITE_SITE_URL` or `REACT_APP_SITE_URL` (falls back to `window.location.origin`).
+- Backend verifies:
+  - `iss` starts with `SUPABASE_URL`
+  - `aud` contains `authenticated` or `supabase`
+  - JWKS keys fetched and cached (10-min TTL)
+- If DB is not configured, only DB-dependent endpoints will return 503; auth endpoints continue to work.

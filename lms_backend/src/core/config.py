@@ -43,8 +43,12 @@ class Settings(BaseModel):
 def get_settings() -> Settings:
     """Build settings object from environment with sane defaults."""
     # Parse allowed origins from comma separated list
-    origins = os.getenv("CORS_ALLOWED_ORIGINS", "*")
-    origin_list = [o.strip() for o in origins.split(",")] if origins else ["*"]
+    origins = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    if not origins:
+        # sensible defaults for local dev
+        origin_list = ["http://localhost:3000", "http://127.0.0.1:3000", "*"]
+    else:
+        origin_list = [o.strip() for o in origins.split(",")] if origins else ["*"]
     supabase_url = os.getenv("SUPABASE_URL", "")
     jwks_url = os.getenv("SUPABASE_JWKS_URL") or (f"{supabase_url}/auth/v1/jwks" if supabase_url else None)
     mongodb_uri = os.getenv("MONGODB_URI", "")
