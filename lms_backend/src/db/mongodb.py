@@ -23,7 +23,10 @@ COLLECTIONS = [
 
 # PUBLIC_INTERFACE
 async def connect_to_mongo() -> None:
-    """Create Motor client and initialize database/collections."""
+    """Create Motor client and initialize database/collections. If DB not configured, skip gracefully."""
+    if not settings.DB_AVAILABLE:
+        logger.warning({"msg": "MongoDB not configured. Skipping DB initialization."})
+        return
     client = AsyncIOMotorClient(settings.MONGODB_URI)
     db = client.get_database(settings.MONGODB_DB_NAME)
     # Create collections if not existing by listing once

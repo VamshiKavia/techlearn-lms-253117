@@ -50,7 +50,7 @@ register_exception_handlers(app)
 # Health and version endpoints
 @app.get("/health", summary="Health Check", tags=["health"])
 async def health_check():
-    return {"status": "OK"}
+    return {"status": "OK", "db_available": settings.DB_AVAILABLE, "auth": "supabase"}
 
 @app.get("/", summary="Service Version", tags=["health"])
 async def version():
@@ -63,7 +63,10 @@ app.include_router(api_router, prefix="/api/v1")
 @app.on_event("startup")
 async def on_startup():
     await connect_to_mongo()
-    logger.info({"msg": "Application startup complete"})
+    if settings.DB_AVAILABLE:
+        logger.info({"msg": "Application startup complete", "db": "available", "auth": "supabase"})
+    else:
+        logger.warning({"msg": "Application startup complete - DB unavailable (MONGODB_URI not set). Running with limited functionality.", "auth": "supabase"})
 
 @app.on_event("shutdown")
 async def on_shutdown():
