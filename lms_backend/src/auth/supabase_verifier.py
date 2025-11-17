@@ -31,8 +31,17 @@ class JWKSCache:
 _jwks_cache = JWKSCache()
 
 
+# PUBLIC_INTERFACE
 async def verify_supabase_jwt(token: str) -> Dict[str, Any]:
-    """Verify a Supabase JWT using JWKS and validate standard claims."""
+    """Verify a Supabase JWT using JWKS and validate standard claims.
+
+    Behavior:
+    - Fetches and caches JWKS for 10 minutes
+    - Verifies signature using token header 'kid'
+    - Validates 'iss' starts with configured SUPABASE_URL
+    - Accepts audiences: 'authenticated' or 'supabase'
+    - Allows small clock skew for iat/exp implicitly via jose defaults
+    """
     try:
         jwks = await _jwks_cache.get_jwks()
         unverified_header = jwt.get_unverified_header(token)
@@ -46,35 +55,33 @@ async def verify_supabase_jwt(token: str) -> Dict[str, Any]:
         if public_key is None:
             raise JWTError("No matching JWK for kid")
 
+        # Decode and validate standard claims except audience (checked manually)
         payload = jwt.decode(
             token,
             public_key,
-            options={"verify_aud": False},  # we check aud manually
-            algorithms=None,  # derive from token header
+            options={"verify_aud": False},
+            algorithms=None,
         )
 
-        # Validate issuer
+        # Issuer should match the Supabase project URL
         iss = payload.get("iss")
-        expected_iss_prefix = settings.SUPABASE_URL.rstrip("/")
+        expected_iss_prefix = (settings.SUPABASE_URL or "").rstrip("/")
         if not iss or not iss.startswith(expected_iss_prefix):
             raise JWTError("Invalid issuer")
 
-        # Validate audience contains 'authenticated' or the project ref
+        # Audience: accept 'authenticated' or 'supabase'
         aud = payload.get("aud")
         if isinstance(aud, str):
-            aud_ok = aud == "authenticated" or aud == "supabase"
+            aud_ok = aud in ("authenticated", "supabase")
         elif isinstance(aud, list):
-            aud_ok = "authenticated" in aud or "supabase" in aud
+            aud_ok = any(a in ("authenticated", "supabase") for a in aud)
         else:
             aud_ok = False
         if not aud_ok:
             raise JWTError("Invalid audience")
 
-        # exp and iat validated by jose decode by default; if not, validate manually
-        # Return payload
         return payload
     except Exception as e:
-        # Normalize to JWTError
         if isinstance(e, JWTError):
             raise
         raise JWTError(str(e))

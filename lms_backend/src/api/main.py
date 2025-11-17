@@ -5,7 +5,8 @@ from src.core.config import settings, validate_settings_or_exit
 from src.utils.logging import configure_logging, logger
 from src.errors.handlers import register_exception_handlers
 from src.db.mongodb import connect_to_mongo, close_mongo_connection
-from src.api.v1.router import api_router, tags_metadata
+from src.api.v1.router import api_router
+from src.api.v1 import openapi_tags as tags_metadata
 from src.utils.rate_limit import RateLimitMiddleware
 from src.utils.request_id import get_request_id
 
@@ -23,10 +24,11 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS or ["http://localhost:3000"],
+    allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Request-ID"],
+    expose_headers=["X-Request-ID"],
 )
 
 # Rate limiting placeholder middleware

@@ -17,11 +17,15 @@ async def me(user=Depends(get_current_user)):
     "/debug",
     summary="Auth debug",
     description="Temporary endpoint to echo current auth status and normalized user. Use for integration verification.",
-    responses={200: {"description": "Debug info with user and claims (if authenticated)."}},
+    responses={200: {"description": "Debug info with user and claims (if authenticated)."}, 401: {"description": "Missing or invalid token."}},
 )
 async def auth_debug(user=Depends(get_current_user)):
-    """Return diagnostic information about the current authenticated user and claims."""
-    # Avoid returning full claims in production; this is temporary for debugging
+    """Return diagnostic information about the current authenticated user and claims.
+
+    Returns:
+        200 with { authenticated, user, claims } when token valid.
+        401 if missing/invalid token (raised by dependency).
+    """
     claims = user.get("claims", {})
     # Only include non-sensitive subset
     safe_claims = {
@@ -32,7 +36,7 @@ async def auth_debug(user=Depends(get_current_user)):
         "role": claims.get("app_metadata", {}).get("role") or claims.get("role"),
         "exp": claims.get("exp"),
         "iat": claims.get("iat"),
-      }
+    }
     return {
         "authenticated": True,
         "user": {
