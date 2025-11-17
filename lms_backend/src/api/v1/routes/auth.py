@@ -1,49 +1,49 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from src.db.mongodb import get_db
+from src.schemas.auth import SignupRequest, TokenResponse, RefreshRequest
 from src.schemas.user import UserPublic
+from src.services.auth_service import signup as svc_signup, authenticate, issue_tokens, refresh_tokens
 from src.auth.dependencies import get_current_user
 
-router = APIRouter(tags=["auth"])
+router = APIRouter()
 
 
 # PUBLIC_INTERFACE
-@router.get("/me", response_model=UserPublic, summary="Get current user (Supabase)", description="Return current authenticated user's public info from Supabase JWT.")
+@router.post("/signup", response_model=UserPublic, summary="User signup")
+async def signup(payload: SignupRequest):
+    """Register a new user; returns public user info."""
+    db = get_db()
+    try:
+        user_id = await svc_signup(db, payload.email, payload.password, payload.name, payload.role)
+        return UserPublic(id=user_id, email=payload.email, name=payload.name, role=payload.role)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# PUBLIC_INTERFACE
+@router.post("/login", response_model=TokenResponse, summary="User login with credentials")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """Login using OAuth2 form (username=email)."""
+    db = get_db()
+    user = await authenticate(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    return issue_tokens(user["id"])
+
+
+# PUBLIC_INTERFACE
+@router.post("/refresh", response_model=TokenResponse, summary="Refresh access token")
+async def refresh(payload: RefreshRequest):
+    """Refresh tokens using a valid refresh token."""
+    try:
+        return refresh_tokens(payload.refresh_token)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
+
+
+# PUBLIC_INTERFACE
+@router.get("/me", response_model=UserPublic, summary="Get current user")
 async def me(user=Depends(get_current_user)):
-    """Return current authenticated user's public info from Supabase JWT."""
-    # Name may not be present; use empty string default
+    """Return current authenticated user's public info."""
     return UserPublic(id=user["id"], email=user["email"], name=user.get("name", ""), role=user.get("role", "student"))
-
-# PUBLIC_INTERFACE
-@router.get(
-    "/debug",
-    summary="Auth debug",
-    description="Temporary endpoint to echo current auth status and normalized user. Use for integration verification.\n\nUsage:\n- Send Authorization: Bearer <supabase_jwt> header.\n- Confirms backend JWKS verification and CORS path.\n- If 401, check anon key validity and frontend token propagation.",
-    responses={200: {"description": "Debug info with user and claims (if authenticated)."}, 401: {"description": "Missing or invalid token."}},
-    name="auth_debug",
-)
-async def auth_debug(user=Depends(get_current_user)):
-    """Return diagnostic information about the current authenticated user and claims.
-
-    Returns:
-        200 with { authenticated, user, claims } when token valid.
-        401 if missing/invalid token (raised by dependency).
-    """
-    claims = user.get("claims", {})
-    # Only include non-sensitive subset
-    safe_claims = {
-        "sub": claims.get("sub"),
-        "email": claims.get("email"),
-        "aud": claims.get("aud"),
-        "iss": claims.get("iss"),
-        "role": claims.get("app_metadata", {}).get("role") or claims.get("role"),
-        "exp": claims.get("exp"),
-        "iat": claims.get("iat"),
-    }
-    return {
-        "authenticated": True,
-        "user": {
-            "id": user.get("id"),
-            "email": user.get("email"),
-            "role": user.get("role"),
-        },
-        "claims": safe_claims,
-    }

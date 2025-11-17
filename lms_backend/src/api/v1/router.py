@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from src.api.v1.routes import auth, courses, health
 
-# PUBLIC_INTERFACE
+# Define OpenAPI tags metadata
 tags_metadata = [
     {"name": "health", "description": "Service health and diagnostics."},
     {"name": "auth", "description": "Authentication and user account endpoints."},

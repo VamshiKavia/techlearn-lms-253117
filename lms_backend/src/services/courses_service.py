@@ -1,6 +1,5 @@
 from typing import List, Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
 from src.db.repository import insert_one, find_many, find_one, update_one, delete_one
 
 
@@ -25,11 +24,7 @@ async def list_courses(db: AsyncIOMotorDatabase, limit: int = 50, skip: int = 0)
 # PUBLIC_INTERFACE
 async def get_course(db: AsyncIOMotorDatabase, course_id: str) -> Optional[Dict[str, Any]]:
     """Get course by id."""
-    try:
-        oid = ObjectId(course_id)
-    except Exception:
-        return None
-    return await find_one(db["courses"], {"_id": oid})
+    return await find_one(db["courses"], {"_id": course_id})
 
 
 # PUBLIC_INTERFACE

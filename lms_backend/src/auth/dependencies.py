@@ -1,56 +1,40 @@
-from typing import Any, Dict, Optional
-
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
+from src.auth.security import decode_token
+from src.db.mongodb import get_db
+from src.db.repository import find_one
 
-from src.auth.supabase_verifier import verify_supabase_jwt
-from src.core.config import settings
-
-security_scheme = HTTPBearer(auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 ROLES = ("admin", "instructor", "student")
 
 
 # PUBLIC_INTERFACE
-async def get_current_user(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)) -> Dict[str, Any]:
-    """Return current authenticated user using Supabase JWT verification.
-
-    Extracts Bearer token from Authorization header, verifies via Supabase JWKS, validates claims,
-    and returns a normalized user dict: {id, email, role, raw_claims}.
-    """
-    if not credentials or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token")
-
-    token = credentials.credentials
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    """Return user from access token."""
     try:
-        payload = await verify_supabase_jwt(token)
+        payload = decode_token(token)
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
         user_id = payload.get("sub")
         if not user_id:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token (no sub)")
-
-        email = payload.get("email") or payload.get("user_metadata", {}).get("email")
-        # Roles can be set in app_metadata.role or custom claim; fallback to 'student'
-        role = (
-            payload.get("app_metadata", {}).get("role")
-            or payload.get("role")
-            or "student"
-        )
-
-        user: Dict[str, Any] = {
-            "id": user_id,
-            "email": email or "",
-            "role": role if role in ROLES else "student",
-            "claims": payload,
-        }
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        db = get_db()
+        user = await find_one(db["users"], {"_id": user_id})  # this path expects string id; fallback below
+        if not user:
+            # fallback by converting string to ObjectId inside repository if needed
+            user = await find_one(db["users"], {"id": user_id})
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
         return user
-    except JWTError as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid token: {str(e)}")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token decode failed")
 
 
 # PUBLIC_INTERFACE
 def require_roles(*allowed_roles: str):
-    """Dependency factory to enforce RBAC based on Supabase JWT claims."""
+    """Dependency factory to enforce RBAC."""
     for r in allowed_roles:
         if r not in ROLES:
             raise ValueError(f"Unknown role: {r}")
@@ -62,12 +46,3 @@ def require_roles(*allowed_roles: str):
         return user
 
     return _dep
-
-
-# PUBLIC_INTERFACE
-def require_db():
-    """Dependency to enforce database availability. Raises 503 if DB is not configured."""
-    from fastapi import HTTPException
-    if not settings.DB_AVAILABLE:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Database not configured")
-    return True
