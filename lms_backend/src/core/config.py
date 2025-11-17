@@ -5,7 +5,12 @@ from pydantic import BaseModel, Field
 
 
 class Settings(BaseModel):
-    """Application settings loaded from environment variables."""
+    """Application settings loaded from environment variables.
+
+    Notes:
+    - MONGODB_URI is optional; when provided, DB features are enabled and a connection will be attempted on startup.
+    - Supabase URL/Key are required for auth; not modified by DB settings.
+    """
 
     APP_NAME: str = Field(default="TechLearn LMS Backend")
     APP_ENV: str = Field(default="development")

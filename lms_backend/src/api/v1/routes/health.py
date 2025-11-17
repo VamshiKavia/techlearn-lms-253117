@@ -9,6 +9,9 @@ async def health() -> dict:
     """Return service health status.
 
     Provides a lightweight readiness/liveness signal that does not depend on external services.
+    Includes:
+      - db_available: whether MongoDB connected successfully (non-blocking ping at startup)
+      - auth: authentication provider name ("supabase")
     """
     return {
         "status": "OK",

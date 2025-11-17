@@ -25,6 +25,7 @@ Open http://localhost:3001/docs for API docs.
 
 Notes:
 - When `MONGODB_URI` is not set, DB-dependent endpoints respond with 503 "Database not configured".
+- On startup the app performs a quick non-blocking `ping` to MongoDB; on success logs `MongoDB connected` and enables DB features; on failure it logs an error and continues to serve with `db_available=false`.
 - Auth endpoints issuing local JWTs are deprecated; use Supabase for sign-in/up. Backend provides `/api/v1/auth/me` to fetch the current user from the Supabase JWT.
 
 ## Scripts

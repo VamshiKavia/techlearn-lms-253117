@@ -9,7 +9,7 @@ For this step, the backend service has been scaffolded and migrated to Supabase 
 
 Quick start (backend):
 1) cd lms_backend
-2) cp .env.example .env  # then set SUPABASE_URL and SUPABASE_KEY; MONGODB_URI is optional
+2) cp .env.example .env  # set SUPABASE_URL and SUPABASE_KEY; set MONGODB_URI to enable DB
 3) pip install -r requirements.txt
 4) uvicorn src.api.main:app --reload --port 3001
 

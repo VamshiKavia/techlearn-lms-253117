@@ -51,7 +51,11 @@ register_exception_handlers(app)
 # PUBLIC_INTERFACE
 @app.get("/health", summary="Health Check", tags=["health"])
 async def health_check() -> dict:
-    """Return a simple health response without blocking on external dependencies."""
+    """Return a simple health response without blocking on external dependencies.
+
+    Returns:
+        JSON object: { status: "OK", db_available: <bool>, auth: "supabase" }
+    """
     return {"status": "OK", "db_available": settings.DB_AVAILABLE, "auth": "supabase"}
 
 # PUBLIC_INTERFACE
