@@ -36,6 +36,7 @@ class Settings(BaseModel):
 
 @lru_cache
 def get_settings() -> Settings:
+    """Build settings object from environment with sane defaults."""
     # Parse allowed origins from comma separated list
     origins = os.getenv("CORS_ALLOWED_ORIGINS", "*")
     origin_list = [o.strip() for o in origins.split(",")] if origins else ["*"]
@@ -49,15 +50,12 @@ def get_settings() -> Settings:
         APP_ENV=os.getenv("APP_ENV", "development"),
         APP_DEBUG=os.getenv("APP_DEBUG", "false").lower() == "true",
         PORT=int(os.getenv("PORT", "3001")),
-
         MONGODB_URI=mongodb_uri,
         MONGODB_DB_NAME=os.getenv("MONGODB_DB_NAME", "techlearn_lms"),
         DB_AVAILABLE=db_available,
-
         SUPABASE_URL=supabase_url,
         SUPABASE_KEY=os.getenv("SUPABASE_KEY", ""),
         SUPABASE_JWKS_URL=jwks_url,
-
         JWT_ALGORITHM=os.getenv("JWT_ALGORITHM", "HS256"),
         ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")),
         REFRESH_TOKEN_EXPIRE_MINUTES=int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", str(60 * 24 * 7))),
@@ -69,21 +67,30 @@ def get_settings() -> Settings:
 settings = get_settings()
 
 
+# PUBLIC_INTERFACE
 def validate_settings_or_exit() -> None:
     """Validate required settings on startup.
-    - Require Supabase URL and Key
-    - MongoDB is optional: if missing, set DB_AVAILABLE to False and continue
+
+    PUBLIC BEHAVIOR:
+    - Require Supabase URL and Key; if missing, raise a clear RuntimeError.
+    - MongoDB is OPTIONAL. If missing, do NOT raise; mark DB_AVAILABLE=False and continue.
+
+    This ensures the FastAPI app can boot and serve /health even when DB is unavailable.
     """
+    # MongoDB optional: reflect availability flag but never block startup
+    if not settings.MONGODB_URI:
+        settings.DB_AVAILABLE = False
+
+    # Supabase envs must be present for auth-protected routes to function
     missing = []
     if not settings.SUPABASE_URL:
         missing.append("SUPABASE_URL")
     if not settings.SUPABASE_KEY:
         missing.append("SUPABASE_KEY")
 
-    # MongoDB is optional; ensure DB_AVAILABLE flag reflects state
-    if not settings.MONGODB_URI:
-        # mutate cached settings flag to False if not provided
-        settings.DB_AVAILABLE = False
-
     if missing:
-        raise RuntimeError(f"Missing required environment variables: {', '.join(missing)}")
+        # Provide a clear, actionable error while keeping logs clean of secrets
+        raise RuntimeError(
+            "Missing required environment variables for Supabase Auth: "
+            + ", ".join(missing)
+        )

@@ -48,12 +48,16 @@ app.add_middleware(CorrelationIdMiddleware)
 register_exception_handlers(app)
 
 # Health and version endpoints
+# PUBLIC_INTERFACE
 @app.get("/health", summary="Health Check", tags=["health"])
-async def health_check():
+async def health_check() -> dict:
+    """Return a simple health response without blocking on external dependencies."""
     return {"status": "OK", "db_available": settings.DB_AVAILABLE, "auth": "supabase"}
 
+# PUBLIC_INTERFACE
 @app.get("/", summary="Service Version", tags=["health"])
-async def version():
+async def version() -> dict:
+    """Service version and environment information."""
     return {"service": settings.APP_NAME, "version": "1.0.0", "env": settings.APP_ENV}
 
 # Include API v1
